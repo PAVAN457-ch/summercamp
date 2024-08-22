@@ -1,0 +1,64 @@
+create database campTask;
+
+USE campTask; 
+Go
+
+CREATE TABLE Participants (
+    ParticipantID INT PRIMARY KEY IDENTITY(1,1),
+    FirstName NVARCHAR(50),
+    LastName NVARCHAR(50),
+    MiddleName NVARCHAR(50),
+    Gender NVARCHAR(10),
+    Email NVARCHAR(100),
+    PersonalPhone NVARCHAR(15),
+    DateOfBirth DATE
+);
+
+CREATE TABLE Camps (
+    CampID INT PRIMARY KEY IDENTITY(1,1),
+    Title NVARCHAR(100) NOT NULL,
+    StartDate DATE NOT NULL,
+    EndDate DATE NOT NULL,
+    Price DECIMAL(10, 2) NOT NULL,
+    Capacity INT NOT NULL
+);
+
+CREATE TABLE CampVisits (
+    VisitID INT PRIMARY KEY IDENTITY(1,1),
+    ParticipantID INT,
+    CampID INT,
+    VisitDate DATE,
+    FOREIGN KEY (ParticipantID) REFERENCES Participants(ParticipantID),
+    FOREIGN KEY (CampID) REFERENCES Camps(CampID)
+);
+
+-- Sample data for Participants
+INSERT INTO Participants (FirstName, LastName, MiddleName, Gender, Email, PersonalPhone, DateOfBirth)
+VALUES
+('Lakshmi', 'Kumar', 'S', 'Female', 'lakshmi.kumar@example.com', '555-1234', '2005-06-15'),
+('Ravi', 'Sharma', NULL, 'Male', 'ravi.sharma@example.com', '555-5678', '2007-08-22'),
+('pavan', 'kumar', NULL, 'Male', 'pavan.kumar@example.com', '555-4659', '2006-09-05');
+
+-- Sample data for Camps
+INSERT INTO Camps (Title, StartDate, EndDate, Price, Capacity)
+VALUES
+('Summer Fun', '2024-06-01', '2024-06-15', 300.00, 50),
+('Adventure Camp', '2024-07-01', '2024-07-10', 400.00, 30);
+
+-- Sample data for CampVisits
+INSERT INTO CampVisits (ParticipantID, CampID, VisitDate)
+VALUES
+((SELECT ParticipantID FROM Participants WHERE FirstName = 'Lakshmi' AND LastName = 'Kumar'), 
+ (SELECT CampID FROM Camps WHERE Title = 'Summer Fun'), 
+ '2024-06-10'),
+((SELECT ParticipantID FROM Participants WHERE FirstName = 'Lakshmi' AND LastName = 'Kumar'), 
+ (SELECT CampID FROM Camps WHERE Title = 'Adventure Camp'), 
+ '2023-07-05');
+
+ select * from CampVisits
+
+SELECT COUNT(*) AS VisitCount
+FROM CampVisits cv
+JOIN Participants p ON cv.ParticipantID = p.ParticipantID
+WHERE p.FirstName = 'Lakshmi'
+  AND cv.VisitDate >= DATEADD(YEAR, -3, GETDATE());
