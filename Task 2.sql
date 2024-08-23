@@ -1,138 +1,12 @@
 
-DROP DATABASE campTask;
-
-USE master;
-GO
-
--- Set the database to SINGLE_USER mode to disconnect all other users
-ALTER DATABASE campTask SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-GO
-
--- Drop the database
-DROP DATABASE campTask;
-GO
-
-USE master;
-GO
-
-SELECT
-    session_id,
-    login_name,
-    status
-FROM sys.dm_exec_sessions
-WHERE database_id = DB_ID('campTask');
-
-
-USE master;
-GO
-
-DROP DATABASE campTask;
-GO
-
-USE master;
-GO
-
-SELECT name
-FROM sys.databases
-WHERE name = 'campTask';
-
-SELECT dp.name AS PrincipalName, 
-       dp.type_desc AS PrincipalType, 
-       p.permission_name, 
-       p.state_desc AS PermissionState
-FROM sys.database_permissions AS p
-JOIN sys.database_principals AS dp
-    ON p.grantee_principal_id = dp.principal_id
-WHERE dp.name = USER_NAME();  -- Shows permissions for the current user
-
-USE master;
-GO
-
-ALTER DATABASE campTask SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-GO
-
-USE master;
-GO
-
-SELECT name
-FROM sys.databases
-WHERE name = 'campTask';
-
-USE campTask;
-GO
-
-SELECT
-    dp.name AS DatabaseRoleName,
-    dp.type_desc AS RoleType
-FROM sys.database_role_members drm
-JOIN sys.database_principals dp
-    ON drm.role_principal_id = dp.principal_id
-WHERE drm.member_principal_id = USER_ID();
-
-USE master;
-GO
-
-SELECT 
-    dp.name AS PrincipalName,
-    dp.type_desc AS PrincipalType,
-    p.permission_name,
-    p.state_desc AS PermissionState
-FROM sys.database_permissions AS p
-JOIN sys.database_principals AS dp
-    ON p.grantee_principal_id = dp.principal_id
-WHERE dp.name = USER_NAME();
-
-USE master;
-GO
-
-SELECT 
-    session_id,
-    blocking_session_id,
-    wait_type,
-    wait_time,
-    wait_resource
-FROM sys.dm_exec_requests
-WHERE database_id = DB_ID('campTask');
-
-USE master;
-GO
-
--- Forcefully kill all active connections
-DECLARE @sql NVARCHAR(MAX) = '';
-SELECT @sql += 'KILL ' + CAST(session_id AS NVARCHAR) + '; '
-FROM sys.dm_exec_sessions
-WHERE database_id = DB_ID('campTask');
-
-USE master;
-GO
-
-DROP DATABASE campTask;
-GO
-
-
-
-
-EXEC sp_executesql @sql;
-
-
-
-KILL [dbo];
-
-
-USE master;
-GO
-
-SELECT
-    session_id,
-    login_name,
-    status
-FROM sys.dm_exec_sessions
-WHERE database_id = DB_ID('campTask');
-
-
 create database campTask
 
--- Drop tables if they exist
+
+
+USE CampTask;
+GO
+
+-- Drop the tables if they exist
 IF OBJECT_ID('CampVisits', 'U') IS NOT NULL
     DROP TABLE CampVisits;
 
@@ -142,16 +16,19 @@ IF OBJECT_ID('Camps', 'U') IS NOT NULL
 IF OBJECT_ID('Participants', 'U') IS NOT NULL
     DROP TABLE Participants;
 
+-- Create the Participants table with the DateOfBirth column
 CREATE TABLE Participants (
     ParticipantID INT PRIMARY KEY IDENTITY(1,1),
     FirstName NVARCHAR(50),
-    LastName NVARCHAR(50),
     MiddleName NVARCHAR(50),
+    LastName NVARCHAR(50),
+    DateOfBirth DATE,  -- DateOfBirth column added here
     Gender NVARCHAR(10),
     Email NVARCHAR(100),
     PersonalPhone NVARCHAR(15)
 );
 
+-- Create the Camps table
 CREATE TABLE Camps (
     CampID INT PRIMARY KEY IDENTITY(1,1),
     Title NVARCHAR(100),
@@ -161,6 +38,7 @@ CREATE TABLE Camps (
     Capacity INT
 );
 
+-- Create the CampVisits table
 CREATE TABLE CampVisits (
     VisitID INT PRIMARY KEY IDENTITY(1,1),
     ParticipantID INT,
@@ -170,40 +48,64 @@ CREATE TABLE CampVisits (
     FOREIGN KEY (CampID) REFERENCES Camps(CampID)
 );
 
--- Populate Participants table
-INSERT INTO Participants (FirstName, LastName, MiddleName, Gender, Email, PersonalPhone)
-SELECT
-    'FirstName' + CAST(ABS(CHECKSUM(NEWID()) % 10000) AS NVARCHAR(4)),
-    'LastName' + CAST(ABS(CHECKSUM(NEWID()) % 10000) AS NVARCHAR(4)),
-    'MiddleName' + CAST(ABS(CHECKSUM(NEWID()) % 10000) AS NVARCHAR(4)),
+DECLARE @i INT = 1;
+DECLARE @Gender NVARCHAR(10);
+DECLARE @DateOfBirth DATE;
+
+WHILE @i <= 5000
+BEGIN
+    -- Determine Gender based on the 65% girls, 35% boys distribution
+    IF RAND() < 0.65 
+        SET @Gender = 'Female';
+    ELSE 
+        SET @Gender = 'Male';
+
+    -- Determine DateOfBirth based on the specified age distribution
+    DECLARE @AgeGroup FLOAT = RAND() * 100;
+    
+    IF @AgeGroup < 18
+        SET @DateOfBirth = DATEADD(YEAR, -FLOOR(RAND() * 6) - 7, GETDATE());  -- 7-12 years old (18%)
+    ELSE IF @AgeGroup < 45
+        SET @DateOfBirth = DATEADD(YEAR, -FLOOR(RAND() * 2) - 13, GETDATE());  -- 13-14 years old (27%)
+    ELSE IF @AgeGroup < 65
+        SET @DateOfBirth = DATEADD(YEAR, -FLOOR(RAND() * 3) - 15, GETDATE());  -- 15-17 years old (20%)
+    ELSE
+        SET @DateOfBirth = DATEADD(YEAR, -FLOOR(RAND() * 5) - 18, GETDATE());  -- 18-19 years old (remaining 35%)
+
+    -- Insert the generated data into the Participants table
+    INSERT INTO Participants (FirstName, MiddleName, LastName, DateOfBirth, Gender, Email, PersonalPhone)
+    VALUES (
+        'FirstName' + CAST(@i AS NVARCHAR(50)),  -- Generating dummy names
+        'MiddleName' + CAST(@i AS NVARCHAR(50)),
+        'LastName' + CAST(@i AS NVARCHAR(50)),
+        @DateOfBirth,
+        @Gender,
+        'email' + CAST(@i AS NVARCHAR(50)) + '@example.com',  -- Generating dummy emails
+        '555-' + RIGHT('0000' + CAST(@i AS NVARCHAR(15)), 4)  -- Generating dummy phone numbers
+    );
+
+    -- Increment the counter
+    SET @i = @i + 1;
+END;
+
+-- Confirm the distribution
+SELECT Gender, COUNT(*) AS Count
+FROM Participants
+GROUP BY Gender;
+
+SELECT 
     CASE
-        WHEN RAND() < 0.65 THEN 'Female'
-        ELSE 'Male'
-    END,
-    'email' + CAST(ABS(CHECKSUM(NEWID()) % 10000) AS NVARCHAR(4)) + '@example.com',
-    '555-' + RIGHT('0000' + CAST(ABS(CHECKSUM(NEWID()) % 10000) AS NVARCHAR(4)), 4)
-FROM
-    (SELECT TOP 5000 1 AS n FROM master.dbo.spt_values) AS a;
-
--- Add Age column for this example
-ALTER TABLE Participants ADD Age INT;
-
--- Query to get gender distribution by generational cohorts
-SELECT
-    Generation,
-    SUM(CASE WHEN Gender = 'Male' THEN 1 ELSE 0 END) AS MaleCount,
-    SUM(CASE WHEN Gender = 'Female' THEN 1 ELSE 0 END) AS FemaleCount,
-    CAST(SUM(CASE WHEN Gender = 'Male' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 AS MalePercentage,
-    CAST(SUM(CASE WHEN Gender = 'Female' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 AS FemalePercentage
-FROM (
-    SELECT
-        CASE
-            WHEN Age BETWEEN 7 AND 12 THEN 'Gen Alpha'
-            WHEN Age BETWEEN 13 AND 17 THEN 'Gen Z'
-            WHEN Age BETWEEN 18 AND 22 THEN 'Millennials'
-            ELSE 'Gen X'
-        END AS Generation,
-        Gender
-    FROM Participants
-) AS SubQuery
-GROUP BY Generation;
+        WHEN DATEDIFF(YEAR, DateOfBirth, GETDATE()) BETWEEN 7 AND 12 THEN '7-12'
+        WHEN DATEDIFF(YEAR, DateOfBirth, GETDATE()) BETWEEN 13 AND 14 THEN '13-14'
+        WHEN DATEDIFF(YEAR, DateOfBirth, GETDATE()) BETWEEN 15 AND 17 THEN '15-17'
+        ELSE '18-19'
+    END AS AgeGroup,
+    COUNT(*) AS Count
+FROM Participants
+GROUP BY 
+    CASE
+        WHEN DATEDIFF(YEAR, DateOfBirth, GETDATE()) BETWEEN 7 AND 12 THEN '7-12'
+        WHEN DATEDIFF(YEAR, DateOfBirth, GETDATE()) BETWEEN 13 AND 14 THEN '13-14'
+        WHEN DATEDIFF(YEAR, DateOfBirth, GETDATE()) BETWEEN 15 AND 17 THEN '15-17'
+        ELSE '18-19'
+    END;
